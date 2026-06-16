@@ -22,7 +22,7 @@ o en SLAM/mapeo autónomo.
 
 **Sensores utilizados :** Los sensores que le implementamos fueron encoders para las ruedas y sensores de distancia infrarrojos (IR) para estimar distancias.
 
-**Actuadores utilizados :** 
+**Actuadores utilizados :** Motores rotacionales izquierdo (left wheel motor) y derecho (right wheel motor)
 
 ## Descripción de los escenarios de prueba
 
