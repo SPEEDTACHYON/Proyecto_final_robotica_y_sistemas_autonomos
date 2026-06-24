@@ -191,13 +191,7 @@ Hay una relación progresivos, los laboratorios nos ayudaron en gran medida a fo
 
 **Conclusión :** Por lo tanto, nuestro proyecto final no inició en esta entrega, inicio desde el laboratorio 1 y la completitud de los objetivos fueron avanzando progresivamente hasta lograr nuestro cometido final, no es posible lograr este proyecto final sin seguir con la consistencia gradual de las anteriores 2 entregas de avances.
 
-## Resultados obtenidos y métricas de desempeño
 
-## Capturas, gráficos o enlaces a videos
-
-## Instrucciones claras para ejecutar la simulación
-
-## Conclusiones, limitaciones y posibles mejoras
 
 
 
