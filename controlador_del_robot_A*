@@ -1,0 +1,233 @@
+from controller import Robot
+import math
+
+ANCHO = 10
+ALTO = 10
+
+# 0 = Libre, 1 = Obstáculo
+cuadricula = [
+    [0,0,0,0,1,0,0,0,0,0],
+    [0,1,1,0,1,0,1,1,1,0],
+    [0,0,1,0,0,0,0,0,1,0],
+    [0,0,1,1,1,1,1,0,1,0],
+    [0,0,0,0,0,0,1,0,0,0],
+    [0,1,1,1,1,0,1,1,1,0],
+    [0,0,0,0,1,0,0,0,1,0],
+    [1,1,1,0,1,1,1,0,1,0],
+    [0,0,0,0,0,0,0,0,0,0],
+    [0,0,1,1,1,1,1,1,1,0]
+]
+
+class Nodo:
+    def __init__(self, x, y):
+        self.x, self.y = x, y 
+        self.g = float("inf") 
+        self.f = float("inf") 
+        self.h = 0            
+        self.padre = None
+        self.abierto = False
+        self.cerrado = False
+
+# Matriz de nodos para la búsqueda del algoritmo A*
+matriz_nodos = [[Nodo(x, y) for x in range(ANCHO)] for y in range(ALTO)]
+
+def calcular_heuristica_manhattan(x1, y1, x2, y2):
+    return abs(x1 - x2) + abs(y1 - y2)
+
+def inicializar_nodos():
+    for fila in matriz_nodos:
+        for nodo in fila:
+            nodo.g = float("inf")
+            nodo.f = float("inf")
+            nodo.padre = None
+            nodo.abierto = False
+            nodo.cerrado = False
+
+def obtener_nodo_menor_f():
+    mejor = None
+    for fila in matriz_nodos:
+        for nodo in fila:
+            if nodo.abierto and (mejor is None or nodo.f < mejor.f):
+                mejor = nodo
+    return mejor
+
+def a_estrella(inicio_x, inicio_y, meta_x, meta_y):
+    inicializar_nodos()
+    inicio = matriz_nodos[inicio_y][inicio_x]
+    inicio.g = 0
+    inicio.h = calcular_heuristica_manhattan(inicio_x, inicio_y, meta_x, meta_y)
+    inicio.f = inicio.h
+    inicio.abierto = True
+
+    while True:
+        actual = obtener_nodo_menor_f()
+        
+        if not actual:
+            print("[Planificador] Atrapado, no hay camino posible.")
+            return None
+            
+        if actual.x == meta_x and actual.y == meta_y:
+            return actual 
+
+        actual.abierto = False
+        actual.cerrado = True
+
+        for dx, dy in [(1,0), (-1,0), (0,1), (0,-1)]:
+            nx, ny = actual.x + dx, actual.y + dy
+
+            if 0 <= nx < ANCHO and 0 <= ny < ALTO and cuadricula[ny][nx] == 0:
+                vecino = matriz_nodos[ny][nx]
+                
+                if vecino.cerrado:
+                    continue
+
+                nuevo_g = actual.g + 1
+
+                if not vecino.abierto or nuevo_g < vecino.g:
+                    vecino.g = nuevo_g
+                    vecino.h = calcular_heuristica_manhattan(nx, ny, meta_x, meta_y)
+                    vecino.f = vecino.g + vecino.h
+                    vecino.padre = actual
+                    vecino.abierto = True
+
+def reconstruir_camino(nodo_meta):
+    camino = []
+    actual = nodo_meta
+    while actual is not None:
+        camino.append((actual.x, actual.y))
+        actual = actual.padre
+    return camino[::-1] 
+
+robot = Robot()
+timestep = int(robot.getBasicTimeStep())
+Ts = timestep / 1000.0  
+
+# Inicializar Actuadores
+left_motor = robot.getDevice('left wheel motor')
+right_motor = robot.getDevice('right wheel motor')
+left_motor.setPosition(float('inf'))
+right_motor.setPosition(float('inf'))
+
+# Inicializar Encoders
+left_encoder = robot.getDevice('left wheel sensor')
+right_encoder = robot.getDevice('right wheel sensor')
+left_encoder.enable(timestep)
+right_encoder.enable(timestep)
+
+# Inicializar Sensores Infrarrojos
+ds_front_L = robot.getDevice('ps7') 
+ds_front_R = robot.getDevice('ps0') 
+ds_diag_L = robot.getDevice('ps6')  
+ds_diag_R = robot.getDevice('ps1')  
+ds_left = robot.getDevice('ps5')     
+ds_right = robot.getDevice('ps2')    
+
+sensores = [ds_front_L, ds_front_R, ds_diag_L, ds_diag_R, ds_left, ds_right]
+for ds in sensores:
+    ds.enable(timestep)
+
+# Lectura inicial de encoders con preventividad
+robot.step(timestep)
+prev_enc_L = left_encoder.getValue() if left_encoder.getValue() == left_encoder.getValue() else 0.0
+prev_enc_R = right_encoder.getValue() if right_encoder.getValue() == right_encoder.getValue() else 0.0
+
+# Parámetros físicos
+R_RUEDA = 0.0205
+
+# Parámetros Kalman
+d_estimada = 0.0  
+P = 1.0           
+Q = 0.1           
+R = 0.05          
+
+# Configuración Navegación
+VEL_CRUCERO = 5.0      
+UMBRAL_CRITICO = 73.0  
+estado_girando = False 
+girar_derecha = True
+z_k_filtrado = 0.0     
+ALFA = 0.2             
+
+inicio_x, inicio_y = 0, 0
+meta_x, meta_y = 9, 8 
+
+print("[Sistema] Calculando ruta global con A* antes de iniciar...")
+nodo_final = a_estrella(inicio_x, inicio_y, meta_x, meta_y)
+
+if nodo_final:
+    camino_optimo = reconstruir_camino(nodo_final)
+    print(f"[Sistema] ¡Ruta inicial cargada con éxito!: {camino_optimo}")
+else:
+    print("[Sistema] Error Fatal: No se encontró camino libre. Revisar cuadrícula.")
+    camino_optimo = []
+
+indice_punto_actual = 0
+pasos_por_celda = 45 
+contador_pasos = 0
+
+while robot.step(timestep) != -1:
+    
+    #  Inicializar valor de velocidades
+    vl = VEL_CRUCERO
+    vr = VEL_CRUCERO
+    
+    # Estimación de avance por encoders
+    curr_enc_L = left_encoder.getValue()
+    curr_enc_R = right_encoder.getValue()
+    diff_L, diff_R = curr_enc_L - prev_enc_L, curr_enc_R - prev_enc_R
+    prev_enc_L, prev_enc_R = curr_enc_L, curr_enc_R
+    
+    ds_lineal = R_RUEDA * (diff_L + diff_R) / 2.0
+
+    # Lectura cruda de sensores
+    val_front_L, val_front_R = ds_front_L.getValue(), ds_front_R.getValue()
+    val_diag_L, val_diag_R = ds_diag_L.getValue(), ds_diag_R.getValue()
+    val_left, val_right = ds_left.getValue(), ds_right.getValue()
+    
+    z_k_raw = max(val_front_L, val_front_R, val_diag_L, val_diag_R)
+
+    # Filtro Simple 
+    z_k_filtrado = (ALFA * z_k_filtrado) + ((1.0 - ALFA) * z_k_raw)
+
+    # Filtro de Kalman
+    d_predicha = d_estimada + (ds_lineal * 1000.0) 
+    P_predicha = P + Q
+    
+    K = P_predicha / (P_predicha + R)
+    d_estimada = d_predicha + K * (z_k_filtrado - d_predicha)
+    P = (1 - K) * P_predicha
+
+    print(f"Raw: {z_k_raw:.1f} | Fil: {z_k_filtrado:.1f} | Kal: {d_estimada:.1f}")
+
+    # Arquitectura híbrida: Reactiva + A*
+    if d_estimada > UMBRAL_CRITICO and not estado_girando:
+        estado_girando = True
+        girar_derecha = (val_left > val_right)
+        print("[Reactivo] ¡Obstáculo imprevisto detectado por Kalman! Evadiendo...")
+        
+    if estado_girando:
+        if girar_derecha:
+            vl, vr = 2.0, -2.0 
+        else:
+            vl, vr = -2.0, 2.0 
+            
+        if d_estimada < 75.0:
+            estado_girando = False
+            print("[Reactivo] Camino despejado. Volviendo a la ruta de A*.")
+            
+    else:
+        if indice_punto_actual < len(camino_optimo):
+            celda_actual = camino_optimo[indice_punto_actual]
+            vl, vr = VEL_CRUCERO, VEL_CRUCERO
+            contador_pasos += 1
+            
+            if contador_pasos >= pasos_por_celda:
+                print(f"[Ruta] Celda lógica {celda_actual} alcanzada con éxito.")
+                contador_pasos = 0
+                indice_punto_actual += 1
+        else:
+            vl, vr = 0.0, 0.0
+            print("[Ruta] ¡El robot e-puck ha llegado de forma autónoma a la Meta Final del mapa!")
+
+    left_motor.setVelocity(vl)
+    right_motor.setVelocity(vr)
