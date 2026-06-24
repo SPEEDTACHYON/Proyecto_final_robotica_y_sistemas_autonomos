@@ -4,9 +4,13 @@ En este repositorio se encontrará la documentación técnica asociada al proyec
 ## Integrantes :
 
 Marcel Gutierrez
+
 Mario Rojas
-Martín Basulto 
+
+Martín Basulto
+
 Benjamín Leiva
+
 Joaquín Rojas
 
 
