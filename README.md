@@ -3,6 +3,12 @@ En este repositorio se encontrará la documentación técnica asociada al proyec
 
 ## Integrantes :
 
+Marcel Gutierrez
+Mario Rojas
+Martín Basulto 
+Benjamín Leiva
+Joaquín Rojas
+
 
 
 ## Linea seleccionada : Planificación de rutas con A*
